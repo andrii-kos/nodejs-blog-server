@@ -1,6 +1,7 @@
 import express from 'express';
 import bodyParser from 'body-parser';
 import feedRoutes from './routes/feed.js';
+import authRoutes from './routes/auth.js'
 import mongoose from 'mongoose';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -47,11 +48,14 @@ app.use((req, res, next) => {
 
 app.use('/feed', feedRoutes)
 
+app.use('/auth', authRoutes)
+
 app.use((err, req, res, next) => {
   console.log(err);
-  const status = err.status;
+  const status = err.statusCode;
   const message = err.message;
-  res.status(status).json(message)
+  const errorData = err.data;
+  res.status(status).json({message, data: errorData})
 })
 
 mongoose.connect('mongodb+srv://ndrwkos:WF6Z5Pcqkdi76gIm@cluster0.tyygxzk.mongodb.net/messanger?retryWrites=true&w=majority')

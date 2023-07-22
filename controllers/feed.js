@@ -1,9 +1,10 @@
 import { validationResult } from "express-validator";
 import Post from "../models/post.js";
-
+import User from "../models/user.js"
 import path, { toNamespacedPath } from "path";
 import fs from "fs";
 import { fileURLToPath } from 'url';
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -63,21 +64,34 @@ export const postPost = (req, res, next) => {
     err.statusCode = 422;
     throw err;
   }
+
   const imageUrl = req.file.path.replace("\\" ,"/");
   const errors = validationResult(req);
+  let creator;
+
   if (!errors.isEmpty()) {
     const err = new Error('Validation Failed')
     err.statusCode = 422;
     throw err
   }
-  const post = new Post({...req.body, imageUrl: imageUrl, creator: {name: 'Andrii'}})
+  const post = new Post({...req.body, imageUrl: imageUrl, creator: req.userId})
   post
     .save()
     .then((result) => {
+      return User.findById(req.userId)
+    .then(user => {
+      user.posts.push(post)
+      creator = user;
+      return user.save()
+    })
+    .then(result => {
       res.status(201).json({
         message: 'Post created succssessfully',
-        post: result
+        post: post,
+        creator: {creatorId: creator._id, name: creator.name}
       })
+    })
+      
     })
     .catch(err => {
       if (!err.statusCode) {
@@ -117,6 +131,11 @@ export const updatePost = (req, res, next) => {
         err.statusCode = 404;
         throw err;
       };
+      if (!post.creator.toString() === req.userId) {
+        const err = new Error('Not Authorized')
+        err.statusCode = 403;
+        throw err;
+      }
       if (imageUrl !== post.imageUrl) {
         clearImage(post.imageUrl)
       }
@@ -146,12 +165,55 @@ export const deletePost = (req, res, next) => {
         err.statusCode = 404;
         throw err;
       };
+      if (!post.creator.toString() === req.userId) {
+        const err = new Error('Not Authorized')
+        err.statusCode = 403;
+        throw err;
+      }
       clearImage(post.imageUrl)
       return Post.findByIdAndRemove(postId)
     })
     .then(result => {
+      return User.findById(req.userId)
+    })
+    .then(user => {
+      user.posts.pull(postId)
+      return user.save()
+    })
+    .then(result => {
       console.log(result)
       res.status(200).json({message: 'Deleted Successfull'})
+    })
+    .catch(err => {
+      if (!err.statusCode) {
+        err.statusCode = 500;
+      }
+      next(err);
+    })
+}
+
+export const getStatus = (req, res, next) => {
+  User.findById(req.userId)
+    .then(user => {
+      res.status(200).json({status: user.status});
+    })
+    .catch(err => {
+      if (!err.statusCode) {
+        err.statusCode = 500;
+      }
+      next(err);
+    })
+};
+
+export const updateStatus = (req, res, next) => {
+  const { status } = req.body;
+  User.findById(req.userId)
+    .then(user => {
+      user.status = status;
+      return user.save()
+    })
+    .then(result => {
+      res.status(200).json({message: "Status updated", status: result.status})
     })
     .catch(err => {
       if (!err.statusCode) {
