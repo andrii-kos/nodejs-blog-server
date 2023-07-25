@@ -6,6 +6,8 @@ import mongoose from 'mongoose';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
+import { Server } from 'socket.io';
+import socketIo from './socketIo.js';
 
 const app = express();
 
@@ -46,9 +48,9 @@ app.use((req, res, next) => {
   next();
 })
 
-app.use('/feed', feedRoutes)
+app.use('/feed', feedRoutes);
+app.use('/auth', authRoutes);
 
-app.use('/auth', authRoutes)
 
 app.use((err, req, res, next) => {
   console.log(err);
@@ -60,7 +62,11 @@ app.use((err, req, res, next) => {
 
 mongoose.connect('mongodb+srv://ndrwkos:WF6Z5Pcqkdi76gIm@cluster0.tyygxzk.mongodb.net/messanger?retryWrites=true&w=majority')
   .then(() => {
-    app.listen(3001)
-    console.log('Contected to mongo db')
+    const server = app.listen(3001);
+    socketIo.init(server);
+    socketIo.getIo().on('connection', (socket) => {
+      console.log('User connected');
+  } );
+    console.log('Contected to mongo db');
   })
   .catch(err => console.log(err))

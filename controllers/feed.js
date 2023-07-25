@@ -4,6 +4,7 @@ import User from "../models/user.js"
 import path, { toNamespacedPath } from "path";
 import fs from "fs";
 import { fileURLToPath } from 'url';
+import socketIo from "../socketIo.js";
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -18,6 +19,8 @@ export const getPosts = (req, res, next) => {
     .then(count => {
       total = count;
       return Post.find()
+        .populate('creator')
+        .sort({createdAt: -1})
         .skip((currentPage - 1) * perPage)
         .limit(perPage)
     })
@@ -68,7 +71,6 @@ export const postPost = (req, res, next) => {
   const imageUrl = req.file.path.replace("\\" ,"/");
   const errors = validationResult(req);
   let creator;
-
   if (!errors.isEmpty()) {
     const err = new Error('Validation Failed')
     err.statusCode = 422;
@@ -85,6 +87,10 @@ export const postPost = (req, res, next) => {
       return user.save()
     })
     .then(result => {
+      socketIo.getIo().emit('posts', {
+        action: 'create',
+        post: {...post._doc, creator: {_id: req.userId, name: creator.name}}
+      })
       res.status(201).json({
         message: 'Post created succssessfully',
         post: post,
@@ -125,13 +131,14 @@ export const updatePost = (req, res, next) => {
   };
 
   Post.findById(postId)
+    .populate('creator')
     .then(post => {
       if (!post) {
         const err = new Error('Could not find post')
         err.statusCode = 404;
         throw err;
       };
-      if (!post.creator.toString() === req.userId) {
+      if (!post.creator._id === req.userId) {
         const err = new Error('Not Authorized')
         err.statusCode = 403;
         throw err;
@@ -142,11 +149,16 @@ export const updatePost = (req, res, next) => {
       post.title = title;
       post.content = content;
       post.imageUrl = imageUrl;
-      post
-        .save()
-        .then(result => {
-          res.status(200).json({message: 'Updated Successfull', post: result})
-        })
+      return post.save()
+    })
+    .then(result => {
+      console.log('eererer')
+      socketIo.getIo().emit('posts', {
+        action: 'update',
+        post: result
+      })
+      res.status(200).json({message: 'Updated Successfull', post: result})
+    
     })
     .catch(err => {
       if (!err.statusCode) {
@@ -181,8 +193,12 @@ export const deletePost = (req, res, next) => {
       return user.save()
     })
     .then(result => {
+      socketIo.getIo().emit('posts', {
+        action: 'delete',
+        postId: postId
+      })
       console.log(result)
-      res.status(200).json({message: 'Deleted Successfull'})
+      res.status(200).json({message: 'Deleted Successfull'});
     })
     .catch(err => {
       if (!err.statusCode) {
