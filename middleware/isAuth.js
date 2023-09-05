@@ -3,25 +3,24 @@ import jwt from 'jsonwebtoken';
 const isAuth = (req, res, next) => {
   const authHeader = req.get('Authorization');
   if (!authHeader) {
-    const err = new Error ('Not Authenticated')
-    err.statusCode = 401;
-    throw err;
+    req.isAuth = false;
+    return next()
   }
   const token = req.get('Authorization').split(' ')[1];
   let decodedToken
   try {
     decodedToken = jwt.verify(token, 'secret')
   } catch (err) {
-    err.statusCode = 500;
-    throw err
+    req.isAuth = false;
+    return next()
   }
   if (!decodedToken) {
-    const err = new Error ('Not Valid Token')
-    err.statusCode = 401;
-    throw err;
+    req.isAuth = false;
+    return next()
   }
   req.userId = decodedToken.userId;
-  next();
+  req.isAuth = true;
+  return next();
 }
 
 export default isAuth;
