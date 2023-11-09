@@ -1,8 +1,7 @@
+import 'dotenv/config';
 import express from 'express';
 import functions from 'firebase-functions';
 import bodyParser from 'body-parser';
-import feedRoutes from './routes/feed.js';
-import authRoutes from './routes/auth.js';
 import mongoose from 'mongoose';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -122,7 +121,7 @@ if (client && client.isConnected()) {
   console.log('DB CLIENT ALREADY CONNECTED')
 
 } else try {
-  client = await mongoose.connect('mongodb+srv://ndrwkos:WF6Z5Pcqkdi76gIm@cluster0.tyygxzk.mongodb.net/messanger?retryWrites=true&w=majority')
+  client = await mongoose.connect(process.env.MONGO_URL)
   .then(() => {
     app.listen(PORT)
     console.log('Contected to mongo db')
